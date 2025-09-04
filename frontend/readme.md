@@ -1,6 +1,3 @@
-# in elm-frontend/
-elm make src/Main.elm --output=public/elm.js
-# serve the static files (pick one)
-npx serve public
-# or
-python -m http.server --directory public 5173
+python -m http.server --directory public 3000
+
+Car accident yesterday. My email is john dot doe at gmail dot com.

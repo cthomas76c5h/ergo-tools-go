@@ -1,31 +1,98 @@
 <!doctype html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ergo Tools Chat Tester (Elm)</title>
-<style>
-body{font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;background:#f8fafc;color:#0f172a;margin:0}
-.container{max-width:1100px;margin:24px auto;padding:0 16px}
-.card{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,0.05)}
-.btn{background:#0284c7;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
-.btn:disabled{opacity:.6;cursor:default}
-.input, textarea{border:1px solid #cbd5e1;border-radius:12px;padding:10px;background:#fff}
-.row{display:grid;gap:12px}
-@media(min-width:860px){.grid{display:grid;grid-template-columns:2fr 1fr;gap:24px}}
-.bubble{display:inline-block;max-width:85%;border-radius:16px;padding:8px 12px;margin:4px 0}
-.user{background:#0369a1;color:#fff;float:right;clear:both}
-.bot{background:#e2e8f0;color:#0f172a;float:left;clear:both}
-pre{white-space:pre-wrap;word-break:break-word}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;color:#fff;font-size:12px}
-.ok{background:#16a34a}.warn{background:#f59e0b}.err{background:#ef4444}.muted{background:#94a3b8}
-.hint{font-size:12px;color:#475569}
-</style>
-</head>
-<body>
-<div id="app"></div>
-<script src="/elm.js"></script>
-<script>
-var app = Elm.Main.init({ node: document.getElementById('app') });
-</script>
-</body>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ergo Tools Chat Tester</title>
+    <style>
+      body { font-family: sans-serif; background: #f8fafc; color: #0f172a; margin: 0; padding: 1rem; }
+      .container { max-width: 800px; margin: auto; }
+      .chat-box { border: 1px solid #ccc; background: #fff; padding: 1rem; height: 400px; overflow-y: auto; border-radius: 8px; }
+      .bubble { padding: 8px 12px; margin: 6px 0; border-radius: 16px; max-width: 70%; }
+      .user { background: #0369a1; color: #fff; margin-left: auto; text-align: right; }
+      .bot { background: #e2e8f0; color: #111; margin-right: auto; text-align: left; }
+      .row { display: flex; gap: 8px; margin-top: 1rem; }
+      input, textarea { flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; }
+      button { padding: 8px 14px; border: none; border-radius: 8px; background: #0284c7; color: #fff; font-weight: bold; cursor: pointer; }
+      pre { background: #f1f5f9; padding: 8px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Ergo Tools Chat Tester</h2>
+      <label>Server URL: <input id="server" value="http://localhost:8000" /></label>
+      <label>Tenant ID: <input id="tenant" value="dev" /></label>
+      <label>Session ID: <input id="session" value="demo123" /></label>
+      <label><input type="checkbox" id="useWs" /> Use WebSocket</label>
+      <div class="chat-box" id="chat"></div>
+      <div class="row">
+        <textarea id="message" rows="2" placeholder="Type a message..."></textarea>
+        <button id="send">Send</button>
+      </div>
+      <h3>Lead Inspector</h3>
+      <pre id="lead">{"lead":null}</pre>
+    </div>
+    <script>
+      const serverInput = document.getElementById("server");
+      const tenantInput = document.getElementById("tenant");
+      const sessionInput = document.getElementById("session");
+      const useWsInput = document.getElementById("useWs");
+      const chatBox = document.getElementById("chat");
+      const leadBox = document.getElementById("lead");
+      const msgInput = document.getElementById("message");
+      const sendBtn = document.getElementById("send");
+
+      let ws = null;
+
+      function addMessage(role, text) {
+        const div = document.createElement("div");
+        div.className = "bubble " + role;
+        div.textContent = text;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function connectWS() {
+        if (ws) ws.close();
+        const url = serverInput.value.replace(/^http/, "ws") + "/ws";
+        ws = new WebSocket(url);
+        ws.onopen = () => console.log("WS connected");
+        ws.onmessage = ev => {
+          const data = JSON.parse(ev.data);
+          addMessage("bot", data.reply);
+          leadBox.textContent = JSON.stringify(data.lead, null, 2);
+        };
+        ws.onclose = () => console.log("WS closed");
+      }
+
+      sendBtn.onclick = () => {
+        const text = msgInput.value.trim();
+        if (!text) return;
+        addMessage("user", text);
+        msgInput.value = "";
+
+        const payload = {
+          tenant_id: tenantInput.value,
+          session_id: sessionInput.value,
+          message: text,
+        };
+
+        if (useWsInput.checked) {
+          if (!ws || ws.readyState !== 1) connectWS();
+          ws.send(JSON.stringify(payload));
+        } else {
+          fetch(serverInput.value + "/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then(res => res.json())
+            .then(data => {
+              addMessage("bot", data.reply);
+              leadBox.textContent = JSON.stringify(data.lead, null, 2);
+            })
+            .catch(err => addMessage("bot", "⚠️ " + err));
+        }
+      };
+    </script>
+  </body>
 </html>

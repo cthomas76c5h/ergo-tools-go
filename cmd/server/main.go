@@ -20,7 +20,17 @@ func main() {
 	}
 
 	r := gin.Default()
-	r.Use(func(c *gin.Context) { c.Writer.Header().Set("Access-Control-Allow-Origin", "*"); c.Next() })
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
 
 	api.RegisterRoutes(r)
 
